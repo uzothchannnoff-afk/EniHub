@@ -266,10 +266,11 @@ TabVisuals:CreateToggle({
 TabScriptBlox:CreateLabel("Powered by ScriptBlox.com")
 
 local searchQuery = ""
+local ResultsSection = TabScriptBlox:CreateSection("Results")
 
 TabScriptBlox:CreateInput({
     Name = "Search Scripts",
-    PlaceholderText = "Ex: Arsenal, Doors, Hub...",
+    PlaceholderText = "Entrez le nom du jeu/script...",
     RemoveTextAfterFocusLost = false,
     Callback = function(Text)
         searchQuery = Text
@@ -277,69 +278,48 @@ TabScriptBlox:CreateInput({
 })
 
 TabScriptBlox:CreateButton({
-    Name = "Search & Load First Result",
+    Name = "Search Scripts",
     Callback = function()
         if searchQuery == "" then return end
         
-        Rayfield:Notify({
-            Title = "ScriptBlox",
-            Content = "Recherche en cours pour: " .. searchQuery,
-            Duration = 3,
-            Image = 4483362458,
-        })
+        -- Nettoyer les anciens résultats
+        ResultsSection:Destroy()
+        ResultsSection = TabScriptBlox:CreateSection("Results for: " .. searchQuery)
+        
+        Rayfield:Notify({Title = "ScriptBlox", Content = "Recherche en cours...", Duration = 2, Image = 4483362458})
         
         local success, response = pcall(function()
-            local url = "https://scriptblox.com/api/script/search?q=" .. HttpService:UrlEncode(searchQuery)
-            return game:HttpGet(url)
+            return game:HttpGet("https://scriptblox.com/api/script/search?q=" .. HttpService:UrlEncode(searchQuery))
         end)
         
         if success then
             local data = HttpService:JSONDecode(response)
             if data and data.result and data.result.scripts then
                 local scriptsList = data.result.scripts
-                if #scriptsList > 0 then
-                    local firstScriptCode = scriptsList[1].script
-                    
-                    Rayfield:Notify({
-                        Title = "Script Trouvé !",
-                        Content = "Exécution de: " .. tostring(scriptsList[1].title),
-                        Duration = 3,
-                        Image = 4483362458,
-                    })
-                    
-                    local runSuccess, runErr = pcall(function()
-                        loadstring(firstScriptCode)()
-                    end)
-                    
-                    if not runSuccess then
-                        warn("Erreur d'exécution: " .. tostring(runErr))
-                        Rayfield:Notify({
-                            Title = "Erreur",
-                            Content = "Impossible d'exécuter le script (voir console F9).",
-                            Duration = 4,
-                            Image = 4483362458,
-                        })
-                    end
-                else
-                    Rayfield:Notify({
-                        Title = "Aucun résultat",
-                        Content = "Aucun script trouvé pour cette recherche.",
-                        Duration = 3,
-                        Image = 4483362458,
+                
+                for _, scriptInfo in ipairs(scriptsList) do
+                    -- Créer un bouton pour chaque résultat trouvé
+                    TabScriptBlox:CreateButton({
+                        Name = "Load: " .. (scriptInfo.title or "Unknown"),
+                        Callback = function()
+                            local s, e = pcall(function()
+                                loadstring(scriptInfo.script)()
+                            end)
+                            if s then
+                                Rayfield:Notify({Title = "Success", Content = "Script exécuté !", Duration = 3, Image = 4483362458})
+                            else
+                                warn("Erreur: " .. tostring(e))
+                                Rayfield:Notify({Title = "Erreur", Content = "Impossible d'exécuter ce script.", Duration = 3, Image = 4483362458})
+                            end
+                        end,
                     })
                 end
+            else
+                Rayfield:Notify({Title = "Aucun résultat", Content = "Aucun script trouvé.", Duration = 3, Image = 4483362458})
             end
-        else
-            Rayfield:Notify({
-                Title = "Erreur API",
-                Content = "Impossible de contacter ScriptBlox.",
-                Duration = 3,
-                Image = 4483362458,
-            })
         end
     end,
 })
-
 -- ==========================================
 -- || 6. CLOUD SCRIPTS
 -- ==========================================
