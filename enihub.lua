@@ -1,8 +1,9 @@
--- [[ ENI HUB V2 - RAYFIELD EDITION (FIXED FLY) ]]
+-- [[ ENI HUB V2 - RAYFIELD EDITION WITH SCRIPTBLOX ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
+local HttpService = game:GetService("HttpService")
 
 local player = Players.LocalPlayer
 
@@ -33,13 +34,17 @@ local TabNotes = Window:CreateTab("Patch Notes", 4483362458)
 local TabLocal = Window:CreateTab("LocalPlayer", 4483362458)
 local TabUniversal = Window:CreateTab("Universal", 4483362458)
 local TabVisuals = Window:CreateTab("Visuals", 4483362458)
+local TabScriptBlox = Window:CreateTab("ScriptBlox", 4483362458)
 local TabCloud = Window:CreateTab("Cloud Scripts", 4483362458)
 
 -- ==========================================
 -- || 1. PATCH NOTES
 -- ==========================================
+TabNotes:CreateLabel("v2.4 - ScriptBlox Integration")
+TabNotes:CreateParagraph({Title = "Changes:", Content = "- Added live ScriptBlox API search tab\n- Integrated automatic script execution from search results\n- Added required 'Powered by ScriptBlox.com' attribution"})
+
 TabNotes:CreateLabel("v2.3 - Fly Direction Bug Fix")
-TabNotes:CreateParagraph({Title = "Changes:", Content = "- Fixed 3D camera-relative flight vectoring\n- Pressing forward/backward/sides now correctly follows camera view on all keyboard layouts"})
+TabNotes:CreateParagraph({Title = "Changes:", Content = "- Fixed 3D camera-relative flight vectoring\n- Pressing forward/backward/sides now correctly follows camera view on all layouts"})
 
 -- ==========================================
 -- || 2. LOCALPLAYER
@@ -256,7 +261,87 @@ TabVisuals:CreateToggle({
 })
 
 -- ==========================================
--- || 5. CLOUD SCRIPTS
+-- || 5. SCRIPTBLOX API
+-- ==========================================
+TabScriptBlox:CreateLabel("Powered by ScriptBlox.com")
+
+local searchQuery = ""
+
+TabScriptBlox:CreateInput({
+    Name = "Search Scripts",
+    PlaceholderText = "Ex: Arsenal, Doors, Hub...",
+    RemoveTextAfterFocusLost = false,
+    Callback = function(Text)
+        searchQuery = Text
+    end,
+})
+
+TabScriptBlox:CreateButton({
+    Name = "Search & Load First Result",
+    Callback = function()
+        if searchQuery == "" then return end
+        
+        Rayfield:Notify({
+            Title = "ScriptBlox",
+            Content = "Recherche en cours pour: " .. searchQuery,
+            Duration = 3,
+            Image = 4483362458,
+        })
+        
+        local success, response = pcall(function()
+            local url = "https://scriptblox.com/api/script/search?q=" .. HttpService:UrlEncode(searchQuery)
+            return game:HttpGet(url)
+        end)
+        
+        if success then
+            local data = HttpService:JSONDecode(response)
+            if data and data.result and data.result.scripts then
+                local scriptsList = data.result.scripts
+                if #scriptsList > 0 then
+                    local firstScriptCode = scriptsList[1].script
+                    
+                    Rayfield:Notify({
+                        Title = "Script Trouvé !",
+                        Content = "Exécution de: " .. tostring(scriptsList[1].title),
+                        Duration = 3,
+                        Image = 4483362458,
+                    })
+                    
+                    local runSuccess, runErr = pcall(function()
+                        loadstring(firstScriptCode)()
+                    end)
+                    
+                    if not runSuccess then
+                        warn("Erreur d'exécution: " .. tostring(runErr))
+                        Rayfield:Notify({
+                            Title = "Erreur",
+                            Content = "Impossible d'exécuter le script (voir console F9).",
+                            Duration = 4,
+                            Image = 4483362458,
+                        })
+                    end
+                else
+                    Rayfield:Notify({
+                        Title = "Aucun résultat",
+                        Content = "Aucun script trouvé pour cette recherche.",
+                        Duration = 3,
+                        Image = 4483362458,
+                    })
+                end
+            end
+        else
+            Rayfield:Notify({
+                Title = "Erreur API",
+                Content = "Impossible de contacter ScriptBlox.",
+                Duration = 3,
+                Image = 4483362458,
+            })
+        end
+    end,
+})
+
+-- ==========================================
+-- || 6. CLOUD SCRIPTS
 -- ==========================================
 local CloudDatabase = {
     {Name = "Infinite Yield (Admin Engine)", Url = "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"},
