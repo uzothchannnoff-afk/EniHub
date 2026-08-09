@@ -1,4 +1,4 @@
--- [[ ENI HUB V2 - RAYFIELD EDITION WITH SCRIPTBLOX ]]
+-- [[ ENI HUB V2 - RAYFIELD EDITION ]]
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -34,14 +34,13 @@ local TabNotes = Window:CreateTab("Patch Notes", 4483362458)
 local TabLocal = Window:CreateTab("LocalPlayer", 4483362458)
 local TabUniversal = Window:CreateTab("Universal", 4483362458)
 local TabVisuals = Window:CreateTab("Visuals", 4483362458)
-local TabScriptBlox = Window:CreateTab("ScriptBlox", 4483362458)
 local TabCloud = Window:CreateTab("Cloud Scripts", 4483362458)
 
 -- ==========================================
 -- || 1. PATCH NOTES
 -- ==========================================
-TabNotes:CreateLabel("v2.4 - ScriptBlox Integration")
-TabNotes:CreateParagraph({Title = "Changes:", Content = "- Added live ScriptBlox API search tab\n- Integrated automatic script execution from search results\n- Added required 'Powered by ScriptBlox.com' attribution"})
+TabNotes:CreateLabel("v2.5 - Removal of ScriptBlox")
+TabNotes:CreateParagraph({Title = "Changes:", Content = "- Completely removed ScriptBlox integration and its tab\n- Cleaned up unused variables and optimized overall performance"})
 
 TabNotes:CreateLabel("v2.3 - Fly Direction Bug Fix")
 TabNotes:CreateParagraph({Title = "Changes:", Content = "- Fixed 3D camera-relative flight vectoring\n- Pressing forward/backward/sides now correctly follows camera view on all layouts"})
@@ -261,67 +260,7 @@ TabVisuals:CreateToggle({
 })
 
 -- ==========================================
--- || 5. SCRIPTBLOX API
--- ==========================================
-TabScriptBlox:CreateLabel("Powered by ScriptBlox.com")
-
-local searchQuery = ""
-local ResultsSection = TabScriptBlox:CreateSection("Results")
-
-TabScriptBlox:CreateInput({
-    Name = "Search Scripts",
-    PlaceholderText = "Entrez le nom du jeu/script...",
-    RemoveTextAfterFocusLost = false,
-    Callback = function(Text)
-        searchQuery = Text
-    end,
-})
-
-TabScriptBlox:CreateButton({
-    Name = "Search Scripts",
-    Callback = function()
-        if searchQuery == "" then return end
-        
-        -- Nettoyer les anciens résultats
-        ResultsSection:Destroy()
-        ResultsSection = TabScriptBlox:CreateSection("Results for: " .. searchQuery)
-        
-        Rayfield:Notify({Title = "ScriptBlox", Content = "Recherche en cours...", Duration = 2, Image = 4483362458})
-        
-        local success, response = pcall(function()
-            return game:HttpGet("https://scriptblox.com/api/script/search?q=" .. HttpService:UrlEncode(searchQuery))
-        end)
-        
-        if success then
-            local data = HttpService:JSONDecode(response)
-            if data and data.result and data.result.scripts then
-                local scriptsList = data.result.scripts
-                
-                for _, scriptInfo in ipairs(scriptsList) do
-                    -- Créer un bouton pour chaque résultat trouvé
-                    TabScriptBlox:CreateButton({
-                        Name = "Load: " .. (scriptInfo.title or "Unknown"),
-                        Callback = function()
-                            local s, e = pcall(function()
-                                loadstring(scriptInfo.script)()
-                            end)
-                            if s then
-                                Rayfield:Notify({Title = "Success", Content = "Script exécuté !", Duration = 3, Image = 4483362458})
-                            else
-                                warn("Erreur: " .. tostring(e))
-                                Rayfield:Notify({Title = "Erreur", Content = "Impossible d'exécuter ce script.", Duration = 3, Image = 4483362458})
-                            end
-                        end,
-                    })
-                end
-            else
-                Rayfield:Notify({Title = "Aucun résultat", Content = "Aucun script trouvé.", Duration = 3, Image = 4483362458})
-            end
-        end
-    end,
-})
--- ==========================================
--- || 6. CLOUD SCRIPTS
+-- || 5. CLOUD SCRIPTS
 -- ==========================================
 local CloudDatabase = {
     {Name = "Infinite Yield (Admin Engine)", Url = "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"},
