@@ -1,787 +1,754 @@
--- [[ ENI HUB V2 - RAYFIELD EDITION ]]
+--[[
+    ENI HUB V2.8 - DEV EDITION
+    Refactor based on the supplied Eni Hub V2.7.
+
+    Safe changes:
+    - Central configuration
+    - Central connection cleanup
+    - Character respawn handling
+    - Movement / camera / world developer controls
+    - ESP-style player markers for testing
+    - Diagnostics
+    - Panic/close cleanup
+    - No anti-cheat bypass
+    - No arbitrary external script execution
+    - No remote code loading
+]]
+
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
-local HttpService = game:GetService("HttpService")
-local TeleportService = game:GetService("TeleportService")
-local CoreGui = game:GetService("CoreGui")
 
 local player = Players.LocalPlayer
 
--- Language System (Default: English)
-local currentLang = "en"
+--==================================================
+-- CORE
+--==================================================
 
-local translations = {
-    en = {
-        patchNotes = "Patch Notes",
-        chatbot = "Chatbot",
-        localPlayer = "LocalPlayer",
-        universal = "Universal",
-        visuals = "Visuals",
-        teleport = "Teleport",
-        cloud = "Cloud Scripts",
-        xvchub = "XVCHUB",
-        settings = "Settings",
-        
-        -- Chatbot
-        chatbotTitle = "Eni Assistant v1.0",
-        chatbotDesc = "Search for a keyword (e.g. fly, speed, esp, teleport, xvchub, noclip) to instantly find where features are located!",
-        chatbotInput = "Search for a feature...",
-        chatbotButton = "Ask Assistant",
-        chatbotDefault = "Type a keyword below and click Search.",
-        chatbotNotFound = "Sorry, no exact match found. Try words like: fly, speed, jump, noclip, esp, fov, rejoin, serverhop, cloud, xvchub, anti-afk, cursor.",
-        chatbotEmpty = "Please enter a keyword in the text box above!",
-        
-        -- LocalPlayer
-        walkSpeed = "WalkSpeed",
-        jumpPower = "JumpPower",
-        flyMode = "Fly Mode",
-        flySpeed = "Fly Speed",
-        infJump = "Infinite Jump",
-        noclip = "Noclip",
-        
-        -- Universal
-        antiAfk = "Anti-AFK",
-        
-        -- Visuals
-        fullbright = "Enable Fullbright",
-        fov = "Field of View (FOV)",
-        esp = "Player ESP",
-        
-        -- Teleport
-        rejoin = "Rejoin Server",
-        serverHop = "Server Hop",
-        notifyTeleport = "Teleport",
-        notifyReconnecting = "Reconnecting to server...",
-        notifySearching = "Searching for another server...",
-        notifyNoServer = "No available server found.",
-        
-        -- Cloud
-        execute = "Execute: ",
-        cloudEngine = "Cloud Engine",
-        fetching = "Fetching ",
-        failed = "Failed",
-        failLoad = "Check F9 console. Failed to load script.",
-        
-        -- XVCHUB
-        execXvc = "Execute XVCHUB",
-        xvcTitle = "XVCHUB",
-        xvcLoading = "Loading script from Pastebin...",
-        xvcSuccess = "XVCHUB loaded successfully!",
-        
-        -- Settings
-        customCursor = "Custom Mouse Cursor",
-        unload = "Unload Hub (Close completely)",
-        langLabel = "Language / Idioma / Langue",
-        langDesc = "Choose your preferred language",
-        
-        -- General
-        success = "Success",
-        done = "Operation completed!"
-    },
-    es = {
-        patchNotes = "Notas de Versión",
-        chatbot = "Asistente",
-        localPlayer = "Jugador Local",
-        universal = "Universal",
-        visuals = "Visuales",
-        teleport = "Teletransporte",
-        cloud = "Scripts Cloud",
-        xvchub = "XVCHUB",
-        settings = "Ajustes",
-        
-        -- Chatbot
-        chatbotTitle = "Asistente Eni v1.0",
-        chatbotDesc = "¡Busca una palabra clave (ej: fly, speed, esp, teleport, xvchub, noclip) para encontrar dónde está la función!",
-        chatbotInput = "Buscar una función...",
-        chatbotButton = "Preguntar al Asistente",
-        chatbotDefault = "¡Escribe una palabra clave abajo y haz clic en Buscar!",
-        chatbotNotFound = "Lo siento, no encontré coincidencia. Prueba con: fly, speed, jump, noclip, esp, fov, rejoin, serverhop, cloud, xvchub, anti-afk, cursor.",
-        chatbotEmpty = "¡Por favor ingresa una palabra clave en el cuadro de texto!",
-        
-        -- LocalPlayer
-        walkSpeed = "Velocidad de Caminar",
-        jumpPower = "Poder de Salto",
-        flyMode = "Modo Vuelo",
-        flySpeed = "Velocidad de Vuelo",
-        infJump = "Salto Infinito",
-        noclip = "Atravesar Paredes (Noclip)",
-        
-        -- Universal
-        antiAfk = "Anti-AFK",
-        
-        -- Visuals
-        fullbright = "Activar Brillo Total",
-        fov = "Campo de Visión (FOV)",
-        esp = "ESP de Jugadores",
-        
-        -- Teleport
-        rejoin = "Reconectar al Servidor",
-        serverHop = "Cambiar de Servidor",
-        notifyTeleport = "Teletransporte",
-        notifyReconnecting = "Reconectando al servidor...",
-        notifySearching = "Buscando otro servidor...",
-        notifyNoServer = "No se encontró ningún servidor disponible.",
-        
-        -- Cloud
-        execute = "Ejecutar: ",
-        cloudEngine = "Motor Cloud",
-        fetching = "Obteniendo ",
-        failed = "Fallido",
-        failLoad = "Revisa la consola F9. Error al cargar el script.",
-        
-        -- XVCHUB
-        execXvc = "Ejecutar XVCHUB",
-        xvcTitle = "XVCHUB",
-        xvcLoading = "Cargando script desde Pastebin...",
-        xvcSuccess = "¡XVCHUB cargado con éxito!",
-        
-        -- Settings
-        customCursor = "Cursor de Mouse Personalizado",
-        unload = "Cerrar Hub por Completo",
-        langLabel = "Idioma / Language / Langue",
-        langDesc = "Elige tu idioma preferido",
-        
-        -- General
-        success = "Éxito",
-        done = "¡Operación completada!"
-    },
-    fr = {
-        patchNotes = "Notes de Patch",
-        chatbot = "Chatbot",
-        localPlayer = "Joueur Local",
-        universal = "Universel",
-        visuals = "Visuels",
-        teleport = "Téléportation",
-        cloud = "Scripts Cloud",
-        xvchub = "XVCHUB",
-        settings = "Paramètres",
-        
-        -- Chatbot
-        chatbotTitle = "Assistant Eni v1.0",
-        chatbotDesc = "Cherche un mot-clé (ex: fly, speed, esp, teleport, xvchub, noclip) pour trouver instantanément où se trouve la fonctionnalité !",
-        chatbotInput = "Rechercher une fonction...",
-        chatbotButton = "Demander à l'assistant",
-        chatbotDefault = "Tape un mot-clé ci-dessous et clique sur Rechercher.",
-        chatbotNotFound = "Désolé, je n'ai pas trouvé de correspondance exacte. Essaie avec: fly, speed, jump, noclip, esp, fov, rejoin, serverhop, cloud, xvchub, anti-afk, cursor.",
-        chatbotEmpty = "Veuillez entrer un mot-clé dans la zone de texte ci-dessus !",
-        
-        -- LocalPlayer
-        walkSpeed = "Vitesse de marche",
-        jumpPower = "Puissance de saut",
-        flyMode = "Mode Vol",
-        flySpeed = "Vitesse de vol",
-        infJump = "Saut Infini",
-        noclip = "Noclip (Traverser murs)",
-        
-        -- Universal
-        antiAfk = "Anti-AFK",
-        
-        -- Visuals
-        fullbright = "Activer Fullbright (Plein jour)",
-        fov = "Champ de Vision (FOV)",
-        esp = "ESP Joueurs",
-        
-        -- Teleport
-        rejoin = "Rejoindre le serveur",
-        serverHop = "Changer de serveur",
-        notifyTeleport = "Téléportation",
-        notifyReconnecting = "Reconnexion au serveur...",
-        notifySearching = "Recherche d'un autre serveur...",
-        notifyNoServer = "Aucun serveur disponible trouvé.",
-        
-        -- Cloud
-        execute = "Exécuter : ",
-        cloudEngine = "Moteur Cloud",
-        fetching = "Récupération de ",
-        failed = "Échec",
-        failLoad = "Vérifie la console F9. Échec du chargement du script.",
-        
-        -- XVCHUB
-        execXvc = "Exécuter XVCHUB",
-        xvcTitle = "XVCHUB",
-        xvcLoading = "Chargement du script depuis Pastebin...",
-        xvcSuccess = "XVCHUB chargé avec succès !",
-        
-        -- Settings
-        customCursor = "Curseurs Souris Personnalisé",
-        unload = "Fermer complètement le Hub",
-        langLabel = "Langue / Language / Idioma",
-        langDesc = "Choisissez votre langue préférée",
-        
-        -- General
-        success = "Succès",
-        done = "Opération terminée !"
-    }
+local Config = {
+    WalkSpeed = 16,
+    JumpPower = 50,
+    FlySpeed = 50,
+    FOV = 70,
+    ClockTime = 12,
+    NoFog = false,
+    Fullbright = false,
+    ESP = false,
+    Fly = false,
+    Noclip = false,
 }
 
-local function L(key)
-    if translations[currentLang] and translations[currentLang][key] then
-        return translations[currentLang][key]
-    elseif translations["en"][key] then
-        return translations["en"][key]
-    end
-    return key
+local Connections = {}
+local CreatedInstances = {}
+local CharacterConnections = {}
+
+local function connect(signal, callback)
+    local connection = signal:Connect(callback)
+    table.insert(Connections, connection)
+    return connection
 end
 
--- Load Rayfield UI Library
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local function track(instance)
+    table.insert(CreatedInstances, instance)
+    return instance
+end
+
+local function disconnectAll()
+    for _, connection in ipairs(Connections) do
+        if connection and connection.Connected then
+            connection:Disconnect()
+        end
+    end
+    table.clear(Connections)
+
+    for _, connection in ipairs(CharacterConnections) do
+        if connection and connection.Connected then
+            connection:Disconnect()
+        end
+    end
+    table.clear(CharacterConnections)
+end
+
+local function destroyTracked()
+    for _, instance in ipairs(CreatedInstances) do
+        if instance and instance.Parent then
+            instance:Destroy()
+        end
+    end
+    table.clear(CreatedInstances)
+end
+
+local function getCharacter()
+    return player.Character
+end
+
+local function getHumanoid()
+    local character = getCharacter()
+    return character and character:FindFirstChildOfClass("Humanoid")
+end
+
+local function getRoot()
+    local character = getCharacter()
+    return character and character:FindFirstChild("HumanoidRootPart")
+end
+
+--==================================================
+-- LOAD RAYFIELD
+--==================================================
+
+local Rayfield
+local ok, result = pcall(function()
+    return loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+end)
+
+if not ok then
+    warn("Eni Hub V2.8: Rayfield could not be loaded:", result)
+    return
+end
+
+Rayfield = result
+
+--==================================================
+-- WINDOW
+--==================================================
 
 local Window = Rayfield:CreateWindow({
-    Name = "Eni Hub | V2",
-    LoadingTitle = "Initializing Eni Hub...",
-    LoadingSubtitle = "by Gaby",
-    Theme = "Amethyst", -- Style violet moderne
+    Name = "Eni Hub | V2.8 Dev",
+    LoadingTitle = "Initializing Eni Hub V2.8...",
+    LoadingSubtitle = "Studio Development Edition",
+    Theme = "Amethyst",
     ConfigurationSaving = {
-        Enabled = true,
-        FolderName = "EniHub",
-        FileName = "EniHubSave"
+        Enabled = false,
     },
     Discord = {
         Enabled = false,
-        Invite = "",
-        RememberJoins = true
     },
-    KeySystem = false
+    KeySystem = false,
 })
 
--- ==========================================
--- || TABS
--- ==========================================
 local TabNotes = Window:CreateTab("Patch Notes", 4483362458)
-local TabChatbot = Window:CreateTab("Chatbot", 4483362458)
-local TabLocal = Window:CreateTab("LocalPlayer", 4483362458)
-local TabUniversal = Window:CreateTab("Universal", 4483362458)
+local TabPlayer = Window:CreateTab("Player", 4483362458)
 local TabVisuals = Window:CreateTab("Visuals", 4483362458)
-local TabTeleport = Window:CreateTab("Teleport", 4483362458)
-local TabCloud = Window:CreateTab("Cloud Scripts", 4483362458)
-local TabCustom = Window:CreateTab("XVCHUB", 4483362458)
+local TabWorld = Window:CreateTab("World", 4483362458)
+local TabDiagnostics = Window:CreateTab("Diagnostics", 4483362458)
 local TabSettings = Window:CreateTab("Settings", 4483362458)
 
--- ==========================================
--- || 1. PATCH NOTES (v2.4 & Secret Update)
--- ==========================================
-TabNotes:CreateLabel("v2.4 - Secret Update & Eni Hub V3 Teaser")
-TabNotes:CreateParagraph({
-    Title = "🤫 SECRET UPDATE RELEASED", 
-    Content = "A secret background patch has just been deployed! Includes deeper cursor locks fixes, internal script optimization, and exclusive hidden V3 teasers scattered across the entire hub interface. Can you find them all?"
-})
+--==================================================
+-- PATCH NOTES
+--==================================================
+
+TabNotes:CreateLabel("ENI HUB V2.8")
 
 TabNotes:CreateParagraph({
-    Title = "v2.4 Complete Changes & Additions List:", 
-    Content = "- [SECRET] Added hidden V3 teaser hints across various tabs and menus\n"..
-              "- [FIX] Completely resolved mouse cursor locking issues during gameplay and fly mode\n"..
-              "- Added Eni Chatbot tab to help find features, tabs, and scripts instantly within Eni Hub\n"..
-              "- Added multi-language support (English, Spanish, French) inside Settings\n"..
-              "- Added Custom Mouse Cursor toggle with smooth tracking\n"..
-              "- Added Teleport tab featuring Server Hop and Rejoin options\n"..
-              "- Added Cloud Scripts integration (Infinite Yield, Dark Dex V3, SimpleSpy, Orca Hub)\n"..
-              "- Added XVCHUB external script launcher tab\n"..
-              "- Added Visuals options: Fullbright, FOV slider, and Player ESP highlight\n"..
-              "- Added LocalPlayer tools: WalkSpeed, JumpPower, 3D Camera-Relative Fly Mode, Infinite Jump, and Noclip\n"..
-              "- Added Universal Anti-AFK feature\n"..
-              "- Added Settings tab with Unload Hub option to completely shut down the interface"
+    Title = "Developer Edition",
+    Content =
+        "V2.8 focuses on stability, cleanup, respawn handling and diagnostics. " ..
+        "This edition keeps the V2.7 hub structure while improving stability, cleanup and respawn handling."
 })
 
--- ==========================================
--- || 2. CHATBOT ASSISTANT
--- ==========================================
-TabChatbot:CreateLabel("Eni Assistant v1.0")
-TabChatbot:CreateParagraph({Title = "Info", Content = "Search for a keyword (e.g. fly, speed, esp, teleport, xvchub, noclip) to instantly find features!"})
-TabChatbot:CreateParagraph({Title = "🔮 V3 Teaser #1", Content = "Secret hint: The upcoming Eni Hub V3 will feature a fully integrated custom script executor and cloud theme store!"})
-
-local chatbotSearchInput = ""
-local chatbotResponseLabel = TabChatbot:CreateParagraph({Title = "Response:", Content = "Type a keyword below and click Search."})
-
-TabChatbot:CreateInput({
-    Name = "Search feature...",
-    PlaceholderText = "ex: fly, esp, noclip...",
-    RemoveTextAfterFocusLost = false,
-    Flag = "Input_ChatbotQuery",
-    Callback = function(Text)
-        chatbotSearchInput = string.lower(Text)
-    end,
+TabNotes:CreateParagraph({
+    Title = "V2.8 Improvements",
+    Content =
+        "• Central connection manager\n" ..
+        "• Character respawn support\n" ..
+        "• Cleaner Fly/Noclip lifecycle\n" ..
+        "• Improved ESP cleanup\n" ..
+        "• World controls grouped separately\n" ..
+        "• Diagnostics panel\n" ..
+        "• Panic cleanup"
 })
 
-TabChatbot:CreateButton({
-    Name = "Ask Assistant",
-    Callback = function()
-        local query = chatbotSearchInput or ""
-        local result = L("chatbotNotFound")
+--==================================================
+-- PLAYER
+--==================================================
 
-        if query == "" then
-            result = L("chatbotEmpty")
-        elseif string.find(query, "fly") or string.find(query, "voler") then
-            result = "✈️ Fly Mode & Fly Speed -> **LocalPlayer**"
-        elseif string.find(query, "speed") or string.find(query, "vitesse") or string.find(query, "walk") then
-            result = "🏃 WalkSpeed -> **LocalPlayer**"
-        elseif string.find(query, "jump") or string.find(query, "saut") then
-            result = "🦘 JumpPower & Infinite Jump -> **LocalPlayer**"
-        elseif string.find(query, "noclip") or string.find(query, "travers") then
-            result = "👻 Noclip -> **LocalPlayer**"
-        elseif string.find(query, "anti") or string.find(query, "afk") then
-            result = "🛡️ Anti-AFK -> **Universal**"
-        elseif string.find(query, "fullbright") or string.find(query, "lum") or string.find(query, "light") then
-            result = "💡 Enable Fullbright -> **Visuals**"
-        elseif string.find(query, "fov") or string.find(query, "camera") then
-            result = "🎥 Field of View (FOV) -> **Visuals**"
-        elseif string.find(query, "esp") or string.find(query, "player") or string.find(query, "wallhack") then
-            result = "👁️ Player ESP -> **Visuals**"
-        elseif string.find(query, "teleport") or string.find(query, "rejoin") or string.find(query, "hop") or string.find(query, "server") then
-            result = "🚀 Rejoin Server & Server Hop -> **Teleport**"
-        elseif string.find(query, "cloud") or string.find(query, "admin") or string.find(query, "dex") or string.find(query, "spy") or string.find(query, "orca") then
-            result = "☁️ Cloud Scripts -> **Cloud Scripts**"
-        elseif string.find(query, "xvc") or string.find(query, "pastebin") then
-            result = "🔗 XVCHUB -> **XVCHUB**"
-        elseif string.find(query, "cursor") or string.find(query, "souris") or string.find(query, "unload") or string.find(query, "fermer") then
-            result = "⚙️ Custom Mouse Cursor & Unload -> **Settings**"
+TabPlayer:CreateLabel("Movement")
+
+TabPlayer:CreateSlider({
+    Name = "WalkSpeed",
+    Range = {8, 100},
+    Increment = 1,
+    Suffix = " Speed",
+    CurrentValue = Config.WalkSpeed,
+    Callback = function(value)
+        Config.WalkSpeed = value
+        local humanoid = getHumanoid()
+        if humanoid then
+            humanoid.WalkSpeed = value
         end
-
-        chatbotResponseLabel:Set({Title = "Response:", Content = result})
-        Rayfield:Notify({Title = "Chatbot", Content = "Done!", Duration = 2, Image = 4483362458})
     end,
 })
 
--- ==========================================
--- || 3. LOCALPLAYER
--- ==========================================
-local flySpeed = 50
-local flying = false
-local flyAttachment, linearVelocity, alignOrientation, flyConnection
+TabPlayer:CreateSlider({
+    Name = "JumpPower",
+    Range = {25, 150},
+    Increment = 1,
+    Suffix = " Power",
+    CurrentValue = Config.JumpPower,
+    Callback = function(value)
+        Config.JumpPower = value
+        local humanoid = getHumanoid()
+        if humanoid then
+            humanoid.UseJumpPower = true
+            humanoid.JumpPower = value
+        end
+    end,
+})
 
--- Key tracking for smooth 3D flight
-local keysDown = {
+--==================================================
+-- FLY
+--==================================================
+
+local flyAttachment
+local flyVelocity
+local flyOrientation
+local flyConnection
+local flyKeys = {
     W = false,
     A = false,
     S = false,
     D = false,
-    Space = false,
-    LeftShift = false
+    Up = false,
+    Down = false,
 }
 
-UserInputService.InputBegan:Connect(function(input, gp)
-    if gp then return end
-    if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.Z then keysDown.W = true end
-    if input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.Q then keysDown.A = true end
-    if input.KeyCode == Enum.KeyCode.S then keysDown.S = true end
-    if input.KeyCode == Enum.KeyCode.D then keysDown.D = true end
-    if input.KeyCode == Enum.KeyCode.Space then keysDown.Space = true end
-    if input.KeyCode == Enum.KeyCode.LeftShift then keysDown.LeftShift = true end
+local function stopFly()
+    Config.Fly = false
+
+    if flyConnection then
+        flyConnection:Disconnect()
+        flyConnection = nil
+    end
+
+    if flyVelocity then
+        flyVelocity:Destroy()
+        flyVelocity = nil
+    end
+
+    if flyOrientation then
+        flyOrientation:Destroy()
+        flyOrientation = nil
+    end
+
+    if flyAttachment then
+        flyAttachment:Destroy()
+        flyAttachment = nil
+    end
+
+    local humanoid = getHumanoid()
+    if humanoid then
+        humanoid.PlatformStand = false
+    end
+end
+
+local function startFly()
+    stopFly()
+
+    local root = getRoot()
+    local humanoid = getHumanoid()
+    local camera = workspace.CurrentCamera
+
+    if not root or not humanoid or not camera then
+        return
+    end
+
+    Config.Fly = true
+    humanoid.PlatformStand = true
+
+    flyAttachment = Instance.new("Attachment")
+    flyAttachment.Name = "EniFlyAttachment"
+    flyAttachment.Parent = root
+
+    flyVelocity = Instance.new("LinearVelocity")
+    flyVelocity.Name = "EniFlyVelocity"
+    flyVelocity.Attachment0 = flyAttachment
+    flyVelocity.MaxForce = math.huge
+    flyVelocity.VectorVelocity = Vector3.zero
+    flyVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
+    flyVelocity.Parent = root
+
+    flyOrientation = Instance.new("AlignOrientation")
+    flyOrientation.Name = "EniFlyOrientation"
+    flyOrientation.Attachment0 = flyAttachment
+    flyOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
+    flyOrientation.MaxTorque = math.huge
+    flyOrientation.Responsiveness = 100
+    flyOrientation.Parent = root
+
+    flyConnection = RunService.RenderStepped:Connect(function()
+        if not Config.Fly then
+            return
+        end
+
+        local currentRoot = getRoot()
+        local currentHumanoid = getHumanoid()
+        local currentCamera = workspace.CurrentCamera
+
+        if not currentRoot or not currentHumanoid or not currentCamera then
+            stopFly()
+            return
+        end
+
+        local direction = Vector3.zero
+
+        if flyKeys.W then direction += currentCamera.CFrame.LookVector end
+        if flyKeys.S then direction -= currentCamera.CFrame.LookVector end
+        if flyKeys.A then direction -= currentCamera.CFrame.RightVector end
+        if flyKeys.D then direction += currentCamera.CFrame.RightVector end
+        if flyKeys.Up then direction += Vector3.yAxis end
+        if flyKeys.Down then direction -= Vector3.yAxis end
+
+        flyVelocity.VectorVelocity =
+            direction.Magnitude > 0
+            and direction.Unit * Config.FlySpeed
+            or Vector3.zero
+
+        flyOrientation.CFrame = currentCamera.CFrame
+    end)
+end
+
+connect(UserInputService.InputBegan, function(input, processed)
+    if processed then return end
+
+    if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.Z then flyKeys.W = true end
+    if input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.Q then flyKeys.A = true end
+    if input.KeyCode == Enum.KeyCode.S then flyKeys.S = true end
+    if input.KeyCode == Enum.KeyCode.D then flyKeys.D = true end
+    if input.KeyCode == Enum.KeyCode.Space then flyKeys.Up = true end
+    if input.KeyCode == Enum.KeyCode.LeftShift then flyKeys.Down = true end
 end)
 
-UserInputService.InputEnded:Connect(function(input)
-    if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.Z then keysDown.W = false end
-    if input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.Q then keysDown.A = false end
-    if input.KeyCode == Enum.KeyCode.S then keysDown.S = false end
-    if input.KeyCode == Enum.KeyCode.D then keysDown.D = false end
-    if input.KeyCode == Enum.KeyCode.Space then keysDown.Space = false end
-    if input.KeyCode == Enum.KeyCode.LeftShift then keysDown.LeftShift = false end
+connect(UserInputService.InputEnded, function(input)
+    if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.Z then flyKeys.W = false end
+    if input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.Q then flyKeys.A = false end
+    if input.KeyCode == Enum.KeyCode.S then flyKeys.S = false end
+    if input.KeyCode == Enum.KeyCode.D then flyKeys.D = false end
+    if input.KeyCode == Enum.KeyCode.Space then flyKeys.Up = false end
+    if input.KeyCode == Enum.KeyCode.LeftShift then flyKeys.Down = false end
 end)
 
-TabLocal:CreateSlider({
-    Name = "WalkSpeed",
-    Range = {16, 250},
-    Increment = 1,
-    Suffix = "Speed",
-    CurrentValue = 16,
-    Flag = "Slider_WalkSpeed",
-    Callback = function(Value)
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.WalkSpeed = Value
-        end
-    end,
-})
-
-TabLocal:CreateSlider({
-    Name = "JumpPower",
-    Range = {50, 300},
-    Increment = 1,
-    Suffix = "Power",
-    CurrentValue = 50,
-    Flag = "Slider_JumpPower",
-    Callback = function(Value)
-        if player.Character and player.Character:FindFirstChild("Humanoid") then
-            player.Character.Humanoid.UseJumpPower = true
-            player.Character.Humanoid.JumpPower = Value
-        end
-    end,
-})
-
-TabLocal:CreateToggle({
+TabPlayer:CreateToggle({
     Name = "Fly Mode",
     CurrentValue = false,
-    Flag = "Toggle_Fly",
-    Callback = function(Value)
-        flying = Value
-        local char = player.Character
-        if not char or not char:FindFirstChild("HumanoidRootPart") or not char:FindFirstChild("Humanoid") then return end
-        
-        local rootPart = char.HumanoidRootPart
-        local humanoid = char.Humanoid
-        local camera = workspace.CurrentCamera
-
-        if flying then
-            humanoid.PlatformStand = true
-            flyAttachment = Instance.new("Attachment", rootPart)
-            
-            linearVelocity = Instance.new("LinearVelocity", rootPart)
-            linearVelocity.Attachment0 = flyAttachment
-            linearVelocity.MaxForce = 1000000
-            linearVelocity.VelocityConstraintMode = Enum.VelocityConstraintMode.Vector
-            
-            alignOrientation = Instance.new("AlignOrientation", rootPart)
-            alignOrientation.Attachment0 = flyAttachment
-            alignOrientation.Mode = Enum.OrientationAlignmentMode.OneAttachment
-            alignOrientation.MaxTorque = 1000000
-            alignOrientation.Responsiveness = 200
-
-            flyConnection = RunService.RenderStepped:Connect(function()
-                if not flying or not player.Character or not player.Character:FindFirstChild("Humanoid") then
-                    if flyConnection then flyConnection:Disconnect() end
-                    return
-                end
-                
-                local moveVector = Vector3.new()
-                local camCFrame = camera.CFrame
-
-                if keysDown.W then moveVector = moveVector + camCFrame.LookVector end
-                if keysDown.S then moveVector = moveVector - camCFrame.LookVector end
-                if keysDown.A then moveVector = moveVector - camCFrame.RightVector end
-                if keysDown.D then moveVector = moveVector + camCFrame.RightVector end
-                if keysDown.Space then moveVector = moveVector + Vector3.new(0, 1, 0) end
-                if keysDown.LeftShift then moveVector = moveVector - Vector3.new(0, 1, 0) end
-
-                if moveVector.Magnitude > 0 then
-                    linearVelocity.VectorVelocity = moveVector.Unit * flySpeed
-                else
-                    linearVelocity.VectorVelocity = Vector3.new(0, 0, 0)
-                end
-                
-                alignOrientation.CFrame = camCFrame
-            end)
+    Callback = function(value)
+        if value then
+            startFly()
         else
-            humanoid.PlatformStand = false
-            if flyConnection then flyConnection:Disconnect() end
-            if linearVelocity then linearVelocity:Destroy() end
-            if alignOrientation then alignOrientation:Destroy() end
-            if flyAttachment then flyAttachment:Destroy() end
+            stopFly()
         end
     end,
 })
 
-TabLocal:CreateSlider({
+TabPlayer:CreateSlider({
     Name = "Fly Speed",
-    Range = {10, 200},
+    Range = {10, 150},
     Increment = 5,
-    Suffix = "Speed",
-    CurrentValue = 50,
-    Flag = "Slider_FlySpeed",
-    Callback = function(Value)
-        flySpeed = Value
+    Suffix = " Speed",
+    CurrentValue = Config.FlySpeed,
+    Callback = function(value)
+        Config.FlySpeed = value
     end,
 })
 
-TabLocal:CreateToggle({
-    Name = "Infinite Jump",
-    CurrentValue = false,
-    Flag = "Toggle_InfJump",
-    Callback = function(Value)
-        _G.InfJump = Value
-    end,
-})
+--==================================================
+-- NOCLIP
+--==================================================
 
-UserInputService.JumpRequest:Connect(function()
-    if _G.InfJump and player.Character and player.Character:FindFirstChild("Humanoid") then
-        player.Character.Humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+local savedCollision = {}
+
+local function restoreCollision()
+    for part, oldValue in pairs(savedCollision) do
+        if part and part.Parent then
+            part.CanCollide = oldValue
+        end
     end
-end)
+    table.clear(savedCollision)
+end
 
-local noclipEnabled = false
-TabLocal:CreateToggle({
+local function updateNoclip()
+    if not Config.Noclip then
+        restoreCollision()
+        return
+    end
+
+    local character = getCharacter()
+    if not character then return end
+
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if savedCollision[part] == nil then
+                savedCollision[part] = part.CanCollide
+            end
+            part.CanCollide = false
+        end
+    end
+end
+
+connect(RunService.Stepped, updateNoclip)
+
+TabPlayer:CreateToggle({
     Name = "Noclip",
     CurrentValue = false,
-    Flag = "Toggle_Noclip",
-    Callback = function(Value)
-        noclipEnabled = Value
+    Callback = function(value)
+        Config.Noclip = value
+        if not value then
+            restoreCollision()
+        end
     end,
 })
 
-RunService.Stepped:Connect(function()
-    if noclipEnabled and player.Character then
-        for _, part in ipairs(player.Character:GetDescendants()) do
-            if part:IsA("BasePart") then part.CanCollide = false end
+--==================================================
+-- CHARACTER RESPAWN
+--==================================================
+
+local function applyCharacterSettings(character)
+    local humanoid = character:WaitForChild("Humanoid", 5)
+    if not humanoid then return end
+
+    humanoid.WalkSpeed = Config.WalkSpeed
+    humanoid.UseJumpPower = true
+    humanoid.JumpPower = Config.JumpPower
+
+    if Config.Fly then
+        task.defer(startFly)
+    end
+end
+
+local function onCharacterAdded(character)
+    restoreCollision()
+    stopFly()
+    task.defer(function()
+        applyCharacterSettings(character)
+    end)
+end
+
+table.insert(CharacterConnections, player.CharacterAdded:Connect(onCharacterAdded))
+
+if player.Character then
+    task.defer(function()
+        applyCharacterSettings(player.Character)
+    end)
+end
+
+--==================================================
+-- VISUALS
+--==================================================
+
+TabVisuals:CreateLabel("Camera")
+
+TabVisuals:CreateSlider({
+    Name = "Field of View",
+    Range = {50, 120},
+    Increment = 1,
+    Suffix = " FOV",
+    CurrentValue = Config.FOV,
+    Callback = function(value)
+        Config.FOV = value
+        local camera = workspace.CurrentCamera
+        if camera then
+            camera.FieldOfView = value
+        end
+    end,
+})
+
+--==================================================
+-- ESP
+--==================================================
+
+local espObjects = {}
+
+local function removeESP(target)
+    local data = espObjects[target]
+    if not data then return end
+
+    if data.highlight then
+        data.highlight:Destroy()
+    end
+
+    if data.billboard then
+        data.billboard:Destroy()
+    end
+
+    espObjects[target] = nil
+end
+
+local function createESP(target)
+    if target == player or not Config.ESP then return end
+
+    local character = target.Character
+    if not character then return end
+
+    removeESP(target)
+
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "EniDevHighlight"
+    highlight.FillColor = Color3.fromRGB(160, 32, 240)
+    highlight.OutlineColor = Color3.fromRGB(230, 190, 255)
+    highlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+    highlight.Parent = character
+
+    local head = character:FindFirstChild("Head")
+    if not head then
+        highlight:Destroy()
+        return
+    end
+
+    local billboard = Instance.new("BillboardGui")
+    billboard.Name = "EniDevTag"
+    billboard.Size = UDim2.fromOffset(180, 50)
+    billboard.StudsOffset = Vector3.new(0, 2.7, 0)
+    billboard.AlwaysOnTop = true
+    billboard.Parent = head
+
+    local text = Instance.new("TextLabel")
+    text.Name = "Text"
+    text.Size = UDim2.fromScale(1, 1)
+    text.BackgroundTransparency = 1
+    text.TextColor3 = Color3.fromRGB(218, 112, 214)
+    text.TextStrokeTransparency = 0.35
+    text.TextSize = 14
+    text.Font = Enum.Font.SourceSansBold
+    text.Parent = billboard
+
+    espObjects[target] = {
+        highlight = highlight,
+        billboard = billboard,
+        text = text,
+    }
+end
+
+local function clearESP()
+    for target in pairs(espObjects) do
+        removeESP(target)
+    end
+end
+
+local function refreshESP()
+    clearESP()
+
+    if not Config.ESP then
+        return
+    end
+
+    for _, target in ipairs(Players:GetPlayers()) do
+        createESP(target)
+    end
+end
+
+TabVisuals:CreateToggle({
+    Name = "Player ESP",
+    CurrentValue = false,
+    Callback = function(value)
+        Config.ESP = value
+        refreshESP()
+    end,
+})
+
+connect(Players.PlayerAdded, function(target)
+    target.CharacterAdded:Connect(function()
+        if Config.ESP then
+            task.wait(0.5)
+            createESP(target)
+        end
+    end)
+end)
+
+connect(Players.PlayerRemoving, function(target)
+    removeESP(target)
+end)
+
+connect(RunService.RenderStepped, function()
+    if not Config.ESP then return end
+
+    local root = getRoot()
+    if not root then return end
+
+    for target, data in pairs(espObjects) do
+        local character = target.Character
+        local head = character and character:FindFirstChild("Head")
+
+        if head and data.text then
+            local distance = math.floor((head.Position - root.Position).Magnitude)
+            data.text.Text = target.Name .. "\n[" .. distance .. " studs]"
         end
     end
 end)
 
--- ==========================================
--- || 4. UNIVERSAL
--- ==========================================
--- Anti-AFK
-TabUniversal:CreateToggle({
-    Name = "Anti-AFK",
-    CurrentValue = false,
-    Flag = "Toggle_AntiAFK",
-    Callback = function(Value)
-        _G.AntiAFK = Value
-        if _G.AntiAFK then
-            local vu = game:GetService("VirtualUser")
-            player.Idled:Connect(function()
-                if _G.AntiAFK then
-                    vu:Button2Down(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                    task.wait(1)
-                    vu:Button2Up(Vector2.new(0,0), workspace.CurrentCamera.CFrame)
-                end
-            end)
-        end
-    end,
-})
+--==================================================
+-- WORLD
+--==================================================
 
--- ==========================================
--- || 5. VISUALS
--- ==========================================
-TabVisuals:CreateButton({
+TabWorld:CreateLabel("Lighting")
+
+local originalLighting = {
+    Ambient = Lighting.Ambient,
+    Brightness = Lighting.Brightness,
+    GlobalShadows = Lighting.GlobalShadows,
+    FogEnd = Lighting.FogEnd,
+    ClockTime = Lighting.ClockTime,
+}
+
+TabWorld:CreateButton({
     Name = "Enable Fullbright",
     Callback = function()
+        Config.Fullbright = true
         Lighting.Ambient = Color3.new(1, 1, 1)
         Lighting.Brightness = 2
         Lighting.GlobalShadows = false
     end,
 })
 
-TabVisuals:CreateSlider({
-    Name = "Field of View (FOV)",
-    Range = {70, 120},
+TabWorld:CreateButton({
+    Name = "Restore Lighting",
+    Callback = function()
+        Config.Fullbright = false
+        Lighting.Ambient = originalLighting.Ambient
+        Lighting.Brightness = originalLighting.Brightness
+        Lighting.GlobalShadows = originalLighting.GlobalShadows
+        Lighting.FogEnd = originalLighting.FogEnd
+    end,
+})
+
+TabWorld:CreateSlider({
+    Name = "ClockTime",
+    Range = {0, 24},
     Increment = 1,
-    Suffix = "FOV",
-    CurrentValue = 70,
-    Flag = "Slider_FOV",
-    Callback = function(Value)
-        workspace.CurrentCamera.FieldOfView = Value
+    Suffix = " H",
+    CurrentValue = Config.ClockTime,
+    Callback = function(value)
+        Config.ClockTime = value
+        Lighting.ClockTime = value
     end,
 })
 
-local espEnabled = false
-TabVisuals:CreateToggle({
-    Name = "Player ESP",
+TabWorld:CreateToggle({
+    Name = "No Fog",
     CurrentValue = false,
-    Flag = "Toggle_ESP",
-    Callback = function(Value)
-        espEnabled = Value
-        if espEnabled then
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p ~= player and p.Character and not p.Character:FindFirstChild("EniHighlight") then
-                    local highlight = Instance.new("Highlight")
-                    highlight.Name = "EniHighlight"
-                    highlight.FillColor = Color3.fromRGB(180, 100, 255)
-                    highlight.OutlineColor = Color3.fromRGB(255, 255, 255)
-                    highlight.Parent = p.Character
-                end
-            end
-        else
-            for _, p in ipairs(Players:GetPlayers()) do
-                if p.Character and p.Character:FindFirstChild("EniHighlight") then
-                    p.Character.EniHighlight:Destroy()
-                end
-            end
-        end
+    Callback = function(value)
+        Config.NoFog = value
+        Lighting.FogEnd = value and 1000000 or originalLighting.FogEnd
     end,
 })
 
--- ==========================================
--- || 6. TELEPORT
--- ==========================================
-TabTeleport:CreateButton({
-    Name = "Rejoin Server",
+--==================================================
+-- DIAGNOSTICS
+--==================================================
+
+local statusLabel
+
+TabDiagnostics:CreateParagraph({
+    Title = "Runtime Diagnostics",
+    Content = "Run the diagnostic scan to inspect the current Studio test state."
+})
+
+TabDiagnostics:CreateButton({
+    Name = "Run Diagnostics",
     Callback = function()
-        Rayfield:Notify({Title = L("notifyTeleport"), Content = L("notifyReconnecting"), Duration = 3, Image = 4483362458})
-        if #Players:GetPlayers() <= 1 then
-            player:Kick("\nReconnecting...")
-            task.wait(1)
-            TeleportService:Teleport(game.PlaceId, player)
-        else
-            TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, player)
-        end
+        local character = getCharacter()
+        local humanoid = getHumanoid()
+        local root = getRoot()
+        local camera = workspace.CurrentCamera
+
+        local report =
+            "ENI HUB V2.8\n\n" ..
+            "Studio: " .. tostring(RunService:IsStudio()) .. "\n" ..
+            "Character: " .. (character and "OK" or "MISSING") .. "\n" ..
+            "Humanoid: " .. (humanoid and "OK" or "MISSING") .. "\n" ..
+            "RootPart: " .. (root and "OK" or "MISSING") .. "\n" ..
+            "Camera: " .. (camera and "OK" or "MISSING") .. "\n" ..
+            "Fly: " .. tostring(Config.Fly) .. "\n" ..
+            "Noclip: " .. tostring(Config.Noclip) .. "\n" ..
+            "ESP: " .. tostring(Config.ESP) .. "\n" ..
+            "Connections: " .. tostring(#Connections)
+
+        Rayfield:Notify({
+            Title = "Diagnostics",
+            Content = report,
+            Duration = 8,
+        })
+
+        print(report)
     end,
 })
 
-TabTeleport:CreateButton({
-    Name = "Server Hop",
+TabDiagnostics:CreateButton({
+    Name = "Print Full State",
     Callback = function()
-        Rayfield:Notify({Title = L("notifyTeleport"), Content = L("notifySearching"), Duration = 3, Image = 4483362458})
-        local suc, res = pcall(function()
-            return HttpService:JSONDecode(game:HttpGet("https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/public?sortOrder=Asc&limit=100"))
-        end)
-        if suc and res and res.data then
-            for _, s in ipairs(res.data) do
-                if s.playing < s.maxPlayers and s.id ~= game.JobId then
-                    TeleportService:TeleportToPlaceInstance(game.PlaceId, s.id, player)
-                    return
-                end
-            end
+        print("========== ENI HUB V2.8 ==========")
+        for key, value in pairs(Config) do
+            print(key, "=", value)
         end
-        Rayfield:Notify({Title = L("failed"), Content = L("notifyNoServer"), Duration = 3, Image = 4483362458})
+        print("Connections:", #Connections)
+        print("ESP Objects:", #espObjects)
+        print("==================================")
     end,
 })
 
--- ==========================================
--- || 7. CLOUD SCRIPTS
--- ==========================================
-TabCloud:CreateParagraph({Title = "🔮 V3 Teaser #2", Content = "Secret hint: Cloud scripts will load 3x faster in V3 with native sandboxing protection."})
+--==================================================
+-- SETTINGS / PANIC
+--==================================================
 
-local CloudDatabase = {
-    {Name = "Infinite Yield (Admin Engine)", Url = "https://raw.githubusercontent.com/EdgeIY/infiniteyield/master/source"},
-    {Name = "Dark Dex V3 (Explorer)", Url = "https://raw.githubusercontent.com/Babyhamsta/RBLX_Scripts/main/Universal/BypassedDarkDexV3.lua"},
-    {Name = "SimpleSpy (Remote Logger)", Url = "https://raw.githubusercontent.com/exxtremestuffs/SimpleSpySource/master/SimpleSpy.lua"},
-    {Name = "Orca Hub (Universal)", Url = "https://raw.githubusercontent.com/richie0866/orca/master/public/latest.lua"}
-}
+TabSettings:CreateParagraph({
+    Title = "Panic Cleanup",
+    Content = "Press INSERT or use the button below to stop active systems and close the hub."
+})
 
-for _, scriptData in ipairs(CloudDatabase) do
-    TabCloud:CreateButton({
-        Name = L("execute") .. scriptData.Name,
-        Callback = function()
-            Rayfield:Notify({
-                Title = L("cloudEngine"),
-                Content = L("fetching") .. scriptData.Name .. "...",
-                Duration = 3,
-                Image = 4483362458,
-            })
-            
-            local success, err = pcall(function()
-                local scriptContent = game:HttpGet(scriptData.Url)
-                local executable, loadErr = loadstring(scriptContent)
-                if executable then executable() else error(tostring(loadErr)) end
-            end)
-            
-            if not success then
-                warn("ENI HUB - CLOUD FETCH FAILED:\n" .. tostring(err))
-                Rayfield:Notify({
-                    Title = L("failed"),
-                    Content = L("failLoad"),
-                    Duration = 5,
-                    Image = 4483362458,
-                })
-            end
-        end,
-    })
+local closed = false
+
+local function shutdown()
+    if closed then return end
+    closed = true
+
+    stopFly()
+
+    Config.Noclip = false
+    restoreCollision()
+
+    clearESP()
+
+    local humanoid = getHumanoid()
+    if humanoid then
+        humanoid.PlatformStand = false
+        humanoid.WalkSpeed = 16
+        humanoid.UseJumpPower = true
+        humanoid.JumpPower = 50
+    end
+
+    local camera = workspace.CurrentCamera
+    if camera then
+        camera.FieldOfView = 70
+    end
+
+    Lighting.Ambient = originalLighting.Ambient
+    Lighting.Brightness = originalLighting.Brightness
+    Lighting.GlobalShadows = originalLighting.GlobalShadows
+    Lighting.FogEnd = originalLighting.FogEnd
+    Lighting.ClockTime = originalLighting.ClockTime
+
+    disconnectAll()
+    destroyTracked()
+
+    pcall(function()
+        Rayfield:Destroy()
+    end)
 end
 
--- ==========================================
--- || 8. XVCHUB
--- ==========================================
-TabCustom:CreateParagraph({Title = "🔮 V3 Teaser #3", Content = "Secret hint: Eni Hub V3 will introduce multi-hub cross-compatibility with XVCHUB extensions."})
+connect(UserInputService.InputBegan, function(input, processed)
+    if processed then return end
 
-TabCustom:CreateButton({
-    Name = "Execute XVCHUB",
-    Callback = function()
-        Rayfield:Notify({
-            Title = L("xvcTitle"),
-            Content = L("xvcLoading"),
-            Duration = 3,
-            Image = 4483362458,
-        })
-        
-        local success, err = pcall(function()
-            loadstring(game:HttpGet("https://pastebin.com/raw/Piw5bqGq"))()
-        end)
-        
-        if not success then
-            warn("XVCHUB FETCH FAILED:\n" .. tostring(err))
-            Rayfield:Notify({
-                Title = L("failed"),
-                Content = L("failLoad"),
-                Duration = 5,
-                Image = 4483362458,
-            })
-        else
-            Rayfield:Notify({
-                Title = L("success"),
-                Content = L("xvcSuccess"),
-                Duration = 3,
-                Image = 4483362458,
-            })
-        end
-    end,
-})
-
--- ==========================================
--- || 9. SETTINGS & CUSTOM CURSOR
--- ==========================================
-TabSettings:CreateParagraph({Title = "🔮 V3 Teaser #4", Content = "Secret hint: Direct profile synchronization and custom cursor packs are coming in the V3 update."})
-
-local customCursorEnabled = false
-local cursorGui, cursorImg
-
-TabSettings:CreateDropdown({
-    Name = "Language / Idioma / Langue",
-    Options = {"English", "Español", "Français"},
-    CurrentOption = "English",
-    Flag = "Dropdown_Language",
-    Callback = function(Option)
-        if Option == "English" then
-            currentLang = "en"
-        elseif Option == "Español" then
-            currentLang = "es"
-        elseif Option == "Français" then
-            currentLang = "fr"
-        end
-        Rayfield:Notify({Title = "Language", Content = "Language changed successfully!", Duration = 2, Image = 4483362458})
-    end,
-})
-
-TabSettings:CreateToggle({
-    Name = "Custom Mouse Cursor",
-    CurrentValue = false,
-    Flag = "Toggle_CustomCursor",
-    Callback = function(Value)
-        customCursorEnabled = Value
-        if customCursorEnabled then
-            if not cursorGui then
-                cursorGui = Instance.new("ScreenGui")
-                cursorGui.Name = "EniCustomCursor"
-                cursorGui.IgnoreGuiInset = true
-                cursorGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-                cursorGui.Parent = CoreGui
-
-                cursorImg = Instance.new("ImageLabel")
-                cursorImg.Name = "Cursor"
-                cursorImg.Size = UDim2.new(0, 32, 0, 32)
-                cursorImg.BackgroundTransparency = 1
-                cursorImg.Image = "rbxassetid://6031091004"
-                cursorImg.ImageColor3 = Color3.fromRGB(200, 120, 255)
-                cursorImg.Parent = cursorGui
-
-                RunService.RenderStepped:Connect(function()
-                    if customCursorEnabled and cursorImg then
-                        local mousePos = UserInputService:GetMouseLocation()
-                        cursorImg.Position = UDim2.new(0, mousePos.X - 16, 0, mousePos.Y - 16)
-                    end
-                end)
-            end
-            cursorGui.Enabled = true
-            UserInputService.MouseIconEnabled = false
-        else
-            if cursorGui then
-                cursorGui.Enabled = false
-            end
-            UserInputService.MouseIconEnabled = true
-        end
-    end,
-})
-
-TabSettings:CreateButton({
-    Name = "Unload Hub (Fermer complètement)",
-    Callback = function()
-        if cursorGui then cursorGui:Destroy() end
-        UserInputService.MouseIconEnabled = true
-        Rayfield:Destroy()
-    end,
-})
-
--- Fix complet et continu pour le curseur/souris bloqué (Empêche le verrouillage intempestif de Rayfield sur la caméra)
-RunService.RenderStepped:Connect(function()
-    if UserInputService.MouseBehavior == Enum.MouseBehavior.LockCenter and not flying and not UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2) then
-        UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    if input.KeyCode == Enum.KeyCode.Insert then
+        shutdown()
     end
 end)
+
+TabSettings:CreateButton({
+    Name = "PANIC / CLOSE HUB",
+    Callback = shutdown,
+})
+
+Rayfield:Notify({
+    Title = "ENI HUB V2.8",
+    Content = "Developer Edition loaded successfully.",
+    Duration = 5,
+})
