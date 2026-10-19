@@ -1,18 +1,10 @@
 --[[
-    ENI HUB V2.8 - DEV EDITION
-    Refactor based on the supplied Eni Hub V2.7.
+    ENI HUB V2.9 - FINAL EDITION
+    Official Shutdown & Feature Expansion.
 
-    Safe changes:
-    - Central configuration
-    - Central connection cleanup
-    - Character respawn handling
-    - Movement / camera / world developer controls
-    - ESP-style player markers for testing
-    - Diagnostics
-    - Panic/close cleanup
-    - No anti-cheat bypass
-    - No arbitrary external script execution
-    - No remote code loading
+    Notice:
+    Eni Hub is officially closing. This is the final stable build (V2.9).
+    Thank you to everyone who supported the project!
 ]]
 
 local Players = game:GetService("Players")
@@ -21,14 +13,17 @@ local UserInputService = game:GetService("UserInputService")
 local Lighting = game:GetService("Lighting")
 
 local player = Players.LocalPlayer
+local mouse = player:GetMouse()
 
 --==================================================
--- CORE
+-- CORE & CONFIG
 --==================================================
 
 local Config = {
     WalkSpeed = 16,
+    EnforceSpeed = false,
     JumpPower = 50,
+    InfJump = false,
     FlySpeed = 50,
     FOV = 70,
     ClockTime = 12,
@@ -37,11 +32,13 @@ local Config = {
     ESP = false,
     Fly = false,
     Noclip = false,
+    ClickTP = false,
 }
 
 local Connections = {}
 local CreatedInstances = {}
 local CharacterConnections = {}
+local Waypoints = {}
 
 local function connect(signal, callback)
     local connection = signal:Connect(callback)
@@ -103,7 +100,7 @@ local ok, result = pcall(function()
 end)
 
 if not ok then
-    warn("Eni Hub V2.8: Rayfield could not be loaded:", result)
+    warn("Eni Hub V2.9: Rayfield could not be loaded:", result)
     return
 end
 
@@ -114,49 +111,70 @@ Rayfield = result
 --==================================================
 
 local Window = Rayfield:CreateWindow({
-    Name = "Eni Hub | V2.8 Dev",
-    LoadingTitle = "Initializing Eni Hub V2.8...",
-    LoadingSubtitle = "Studio Development Edition",
+    Name = "Eni Hub | V2.9 Final Edition",
+    LoadingTitle = "ENI HUB IS CLOSING...",
+    LoadingSubtitle = "Final Developer Edition (V2.9)",
     Theme = "Amethyst",
-    ConfigurationSaving = {
-        Enabled = false,
-    },
-    Discord = {
-        Enabled = false,
-    },
+    ConfigurationSaving = { Enabled = false },
+    Discord = { Enabled = false },
     KeySystem = false,
 })
 
+local TabClosing = Window:CreateTab("Annonce / Closing", 4483362458)
 local TabNotes = Window:CreateTab("Patch Notes", 4483362458)
 local TabPlayer = Window:CreateTab("Player", 4483362458)
+local TabTeleport = Window:CreateTab("Teleport", 4483362458)
 local TabVisuals = Window:CreateTab("Visuals", 4483362458)
 local TabWorld = Window:CreateTab("World", 4483362458)
 local TabDiagnostics = Window:CreateTab("Diagnostics", 4483362458)
 local TabSettings = Window:CreateTab("Settings", 4483362458)
 
 --==================================================
+-- CLOSING ANNOUNCEMENT TAB
+--==================================================
+
+TabClosing:CreateLabel("FERMETURE OFFICIELLE D'ENI HUB")
+
+TabClosing:CreateParagraph({
+    Title = "📢 Annonce Importante",
+    Content =
+        "C'est avec une certaine émotion que nous vous annonçons la FERMETURE DÉFINITIVE du projet Eni Hub.\n\n" ..
+        "La version V2.9 est la dernière mise à jour officielle. Le projet ne recevra plus de corrections, " ..
+        "de nouvelles fonctionnalités ni de support futur."
+})
+
+TabClosing:CreateParagraph({
+    Title = "❤️ Merci pour votre soutien !",
+    Content =
+        "Merci à toutes les personnes qui ont testé le hub depuis la V2.7 et qui ont partagé leurs retours. " ..
+        "Ce projet de développement Roblox Studio aura été une super aventure du début à la fin !"
+})
+
+--==================================================
 -- PATCH NOTES
 --==================================================
 
-TabNotes:CreateLabel("ENI HUB V2.8")
+TabNotes:CreateLabel("ENI HUB - PATCH NOTES HISTORY")
 
 TabNotes:CreateParagraph({
-    Title = "Developer Edition",
+    Title = "ENI HUB V2.9 (Final Edition)",
     Content =
-        "V2.8 focuses on stability, cleanup, respawn handling and diagnostics. " ..
-        "This edition keeps the V2.7 hub structure while improving stability, cleanup and respawn handling."
+        "• Ajout de l'annonce officielle de fermeture.\n" ..
+        "• Ajout de l'Infinite Jump.\n" ..
+        "• Ajout du verrouillage de WalkSpeed (Enforce Speed).\n" ..
+        "• Ajout du système de Waypoints (Sauvegarde de positions).\n" ..
+        "• Ajout du Click TP (Ctrl + Clic gauche).\n" ..
+        "• Corrections complètes de stabilité et de mémoire."
 })
 
 TabNotes:CreateParagraph({
-    Title = "V2.8 Improvements",
+    Title = "ENI HUB V2.8 Changes",
     Content =
-        "• Central connection manager\n" ..
-        "• Character respawn support\n" ..
-        "• Cleaner Fly/Noclip lifecycle\n" ..
-        "• Improved ESP cleanup\n" ..
-        "• World controls grouped separately\n" ..
-        "• Diagnostics panel\n" ..
-        "• Panic cleanup"
+        "• Central connection manager.\n" ..
+        "• Character respawn support.\n" ..
+        "• Cleaner Fly/Noclip lifecycle.\n" ..
+        "• Improved ESP cleanup & dictionary counting.\n" ..
+        "• Diagnostics panel & Panic cleanup."
 })
 
 --==================================================
@@ -167,22 +185,37 @@ TabPlayer:CreateLabel("Movement")
 
 TabPlayer:CreateSlider({
     Name = "WalkSpeed",
-    Range = {8, 100},
+    Range = {8, 200},
     Increment = 1,
     Suffix = " Speed",
     CurrentValue = Config.WalkSpeed,
     Callback = function(value)
         Config.WalkSpeed = value
         local humanoid = getHumanoid()
-        if humanoid then
-            humanoid.WalkSpeed = value
-        end
+        if humanoid then humanoid.WalkSpeed = value end
     end,
 })
 
+TabPlayer:CreateToggle({
+    Name = "Lock / Enforce WalkSpeed",
+    CurrentValue = false,
+    Callback = function(value)
+        Config.EnforceSpeed = value
+    end,
+})
+
+connect(RunService.Stepped, function()
+    if Config.EnforceSpeed then
+        local humanoid = getHumanoid()
+        if humanoid and humanoid.WalkSpeed ~= Config.WalkSpeed then
+            humanoid.WalkSpeed = Config.WalkSpeed
+        end
+    end
+end)
+
 TabPlayer:CreateSlider({
     Name = "JumpPower",
-    Range = {25, 150},
+    Range = {25, 250},
     Increment = 1,
     Suffix = " Power",
     CurrentValue = Config.JumpPower,
@@ -196,62 +229,47 @@ TabPlayer:CreateSlider({
     end,
 })
 
+TabPlayer:CreateToggle({
+    Name = "Infinite Jump",
+    CurrentValue = false,
+    Callback = function(value)
+        Config.InfJump = value
+    end,
+})
+
+connect(UserInputService.JumpRequest, function()
+    if Config.InfJump then
+        local humanoid = getHumanoid()
+        if humanoid then
+            humanoid:ChangeState(Enum.HumanoidStateType.Jumping)
+        end
+    end
+end)
+
 --==================================================
 -- FLY
 --==================================================
 
-local flyAttachment
-local flyVelocity
-local flyOrientation
-local flyConnection
-local flyKeys = {
-    W = false,
-    A = false,
-    S = false,
-    D = false,
-    Up = false,
-    Down = false,
-}
+local flyAttachment, flyVelocity, flyOrientation, flyConnection
+local flyKeys = { W = false, A = false, S = false, D = false, Up = false, Down = false }
 
 local function stopFly()
     Config.Fly = false
-
-    if flyConnection then
-        flyConnection:Disconnect()
-        flyConnection = nil
-    end
-
-    if flyVelocity then
-        flyVelocity:Destroy()
-        flyVelocity = nil
-    end
-
-    if flyOrientation then
-        flyOrientation:Destroy()
-        flyOrientation = nil
-    end
-
-    if flyAttachment then
-        flyAttachment:Destroy()
-        flyAttachment = nil
-    end
+    if flyConnection then flyConnection:Disconnect() flyConnection = nil end
+    if flyVelocity then flyVelocity:Destroy() flyVelocity = nil end
+    if flyOrientation then flyOrientation:Destroy() flyOrientation = nil end
+    if flyAttachment then flyAttachment:Destroy() flyAttachment = nil end
 
     local humanoid = getHumanoid()
-    if humanoid then
-        humanoid.PlatformStand = false
-    end
+    if humanoid then humanoid.PlatformStand = false end
 end
 
 local function startFly()
     stopFly()
-
     local root = getRoot()
     local humanoid = getHumanoid()
     local camera = workspace.CurrentCamera
-
-    if not root or not humanoid or not camera then
-        return
-    end
+    if not root or not humanoid or not camera then return end
 
     Config.Fly = true
     humanoid.PlatformStand = true
@@ -277,40 +295,26 @@ local function startFly()
     flyOrientation.Parent = root
 
     flyConnection = RunService.RenderStepped:Connect(function()
-        if not Config.Fly then
-            return
-        end
-
+        if not Config.Fly then return end
         local currentRoot = getRoot()
-        local currentHumanoid = getHumanoid()
         local currentCamera = workspace.CurrentCamera
-
-        if not currentRoot or not currentHumanoid or not currentCamera then
-            stopFly()
-            return
-        end
+        if not currentRoot or not currentCamera then stopFly() return end
 
         local direction = Vector3.zero
+        if flyKeys.W then direction = direction + currentCamera.CFrame.LookVector end
+        if flyKeys.S then direction = direction - currentCamera.CFrame.LookVector end
+        if flyKeys.A then direction = direction - currentCamera.CFrame.RightVector end
+        if flyKeys.D then direction = direction + currentCamera.CFrame.RightVector end
+        if flyKeys.Up then direction = direction + Vector3.yAxis end
+        if flyKeys.Down then direction = direction - Vector3.yAxis end
 
-        if flyKeys.W then direction += currentCamera.CFrame.LookVector end
-        if flyKeys.S then direction -= currentCamera.CFrame.LookVector end
-        if flyKeys.A then direction -= currentCamera.CFrame.RightVector end
-        if flyKeys.D then direction += currentCamera.CFrame.RightVector end
-        if flyKeys.Up then direction += Vector3.yAxis end
-        if flyKeys.Down then direction -= Vector3.yAxis end
-
-        flyVelocity.VectorVelocity =
-            direction.Magnitude > 0
-            and direction.Unit * Config.FlySpeed
-            or Vector3.zero
-
+        flyVelocity.VectorVelocity = direction.Magnitude > 0 and direction.Unit * Config.FlySpeed or Vector3.zero
         flyOrientation.CFrame = currentCamera.CFrame
     end)
 end
 
 connect(UserInputService.InputBegan, function(input, processed)
     if processed then return end
-
     if input.KeyCode == Enum.KeyCode.W or input.KeyCode == Enum.KeyCode.Z then flyKeys.W = true end
     if input.KeyCode == Enum.KeyCode.A or input.KeyCode == Enum.KeyCode.Q then flyKeys.A = true end
     if input.KeyCode == Enum.KeyCode.S then flyKeys.S = true end
@@ -332,23 +336,17 @@ TabPlayer:CreateToggle({
     Name = "Fly Mode",
     CurrentValue = false,
     Callback = function(value)
-        if value then
-            startFly()
-        else
-            stopFly()
-        end
+        if value then startFly() else stopFly() end
     end,
 })
 
 TabPlayer:CreateSlider({
     Name = "Fly Speed",
-    Range = {10, 150},
+    Range = {10, 200},
     Increment = 5,
     Suffix = " Speed",
     CurrentValue = Config.FlySpeed,
-    Callback = function(value)
-        Config.FlySpeed = value
-    end,
+    Callback = function(value) Config.FlySpeed = value end,
 })
 
 --==================================================
@@ -359,27 +357,19 @@ local savedCollision = {}
 
 local function restoreCollision()
     for part, oldValue in pairs(savedCollision) do
-        if part and part.Parent then
-            part.CanCollide = oldValue
-        end
+        if part and part.Parent then part.CanCollide = oldValue end
     end
     table.clear(savedCollision)
 end
 
 local function updateNoclip()
-    if not Config.Noclip then
-        restoreCollision()
-        return
-    end
-
+    if not Config.Noclip then restoreCollision() return end
     local character = getCharacter()
     if not character then return end
 
     for _, part in ipairs(character:GetDescendants()) do
         if part:IsA("BasePart") then
-            if savedCollision[part] == nil then
-                savedCollision[part] = part.CanCollide
-            end
+            if savedCollision[part] == nil then savedCollision[part] = part.CanCollide end
             part.CanCollide = false
         end
     end
@@ -392,8 +382,56 @@ TabPlayer:CreateToggle({
     CurrentValue = false,
     Callback = function(value)
         Config.Noclip = value
-        if not value then
-            restoreCollision()
+        if not value then restoreCollision() end
+    end,
+})
+
+--==================================================
+-- TELEPORT & WAYPOINTS
+--==================================================
+
+TabTeleport:CreateLabel("Quick Teleport")
+
+TabTeleport:CreateToggle({
+    Name = "Ctrl + Click Teleport",
+    CurrentValue = false,
+    Callback = function(value)
+        Config.ClickTP = value
+    end,
+})
+
+connect(UserInputService.InputBegan, function(input, processed)
+    if processed or not Config.ClickTP then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 and UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
+        local root = getRoot()
+        if root and mouse.Hit then
+            root.CFrame = mouse.Hit + Vector3.new(0, 3, 0)
+        end
+    end
+end)
+
+TabTeleport:CreateLabel("Waypoints")
+
+TabTeleport:CreateButton({
+    Name = "Save Current Position",
+    Callback = function()
+        local root = getRoot()
+        if root then
+            local wpName = "Point " .. tostring(#Waypoints + 1)
+            table.insert(Waypoints, { Name = wpName, CFrame = root.CFrame })
+            Rayfield:Notify({ Title = "Waypoint Saved", Content = wpName .. " created!", Duration = 3 })
+        end
+    end,
+})
+
+TabTeleport:CreateButton({
+    Name = "Teleport to Last Waypoint",
+    Callback = function()
+        local root = getRoot()
+        if root and #Waypoints > 0 then
+            root.CFrame = Waypoints[#Waypoints].CFrame
+        else
+            Rayfield:Notify({ Title = "Teleport", Content = "No waypoints saved yet!", Duration = 3 })
         end
     end,
 })
@@ -410,29 +448,20 @@ local function applyCharacterSettings(character)
     humanoid.UseJumpPower = true
     humanoid.JumpPower = Config.JumpPower
 
-    if Config.Fly then
-        task.defer(startFly)
-    end
+    if Config.Fly then task.defer(startFly) end
 end
 
 local function onCharacterAdded(character)
     restoreCollision()
     stopFly()
-    task.defer(function()
-        applyCharacterSettings(character)
-    end)
+    task.defer(function() applyCharacterSettings(character) end)
 end
 
 table.insert(CharacterConnections, player.CharacterAdded:Connect(onCharacterAdded))
-
-if player.Character then
-    task.defer(function()
-        applyCharacterSettings(player.Character)
-    end)
-end
+if player.Character then task.defer(function() applyCharacterSettings(player.Character) end) end
 
 --==================================================
--- VISUALS
+-- VISUALS & ESP
 --==================================================
 
 TabVisuals:CreateLabel("Camera")
@@ -446,36 +475,30 @@ TabVisuals:CreateSlider({
     Callback = function(value)
         Config.FOV = value
         local camera = workspace.CurrentCamera
-        if camera then
-            camera.FieldOfView = value
-        end
+        if camera then camera.FieldOfView = value end
     end,
 })
 
---==================================================
--- ESP
---==================================================
+TabVisuals:CreateLabel("ESP Tools")
 
 local espObjects = {}
+
+local function getESPCount()
+    local count = 0
+    for _ in pairs(espObjects) do count += 1 end
+    return count
+end
 
 local function removeESP(target)
     local data = espObjects[target]
     if not data then return end
-
-    if data.highlight then
-        data.highlight:Destroy()
-    end
-
-    if data.billboard then
-        data.billboard:Destroy()
-    end
-
+    if data.highlight then data.highlight:Destroy() end
+    if data.billboard then data.billboard:Destroy() end
     espObjects[target] = nil
 end
 
 local function createESP(target)
     if target == player or not Config.ESP then return end
-
     local character = target.Character
     if not character then return end
 
@@ -489,10 +512,7 @@ local function createESP(target)
     highlight.Parent = character
 
     local head = character:FindFirstChild("Head")
-    if not head then
-        highlight:Destroy()
-        return
-    end
+    if not head then highlight:Destroy() return end
 
     local billboard = Instance.new("BillboardGui")
     billboard.Name = "EniDevTag"
@@ -511,29 +531,17 @@ local function createESP(target)
     text.Font = Enum.Font.SourceSansBold
     text.Parent = billboard
 
-    espObjects[target] = {
-        highlight = highlight,
-        billboard = billboard,
-        text = text,
-    }
+    espObjects[target] = { highlight = highlight, billboard = billboard, text = text }
 end
 
 local function clearESP()
-    for target in pairs(espObjects) do
-        removeESP(target)
-    end
+    for target in pairs(espObjects) do removeESP(target) end
 end
 
 local function refreshESP()
     clearESP()
-
-    if not Config.ESP then
-        return
-    end
-
-    for _, target in ipairs(Players:GetPlayers()) do
-        createESP(target)
-    end
+    if not Config.ESP then return end
+    for _, target in ipairs(Players:GetPlayers()) do createESP(target) end
 end
 
 TabVisuals:CreateToggle({
@@ -546,31 +554,27 @@ TabVisuals:CreateToggle({
 })
 
 connect(Players.PlayerAdded, function(target)
-    target.CharacterAdded:Connect(function()
-        if Config.ESP then
-            task.wait(0.5)
-            createESP(target)
-        end
+    connect(target.CharacterAdded, function()
+        if Config.ESP then task.wait(0.5) createESP(target) end
     end)
+    connect(target.CharacterRemoving, function() removeESP(target) end)
 end)
 
-connect(Players.PlayerRemoving, function(target)
-    removeESP(target)
-end)
+connect(Players.PlayerRemoving, function(target) removeESP(target) end)
 
 connect(RunService.RenderStepped, function()
     if not Config.ESP then return end
-
     local root = getRoot()
     if not root then return end
 
     for target, data in pairs(espObjects) do
         local character = target.Character
         local head = character and character:FindFirstChild("Head")
-
         if head and data.text then
             local distance = math.floor((head.Position - root.Position).Magnitude)
             data.text.Text = target.Name .. "\n[" .. distance .. " studs]"
+        else
+            removeESP(target)
         end
     end
 end)
@@ -607,6 +611,7 @@ TabWorld:CreateButton({
         Lighting.Brightness = originalLighting.Brightness
         Lighting.GlobalShadows = originalLighting.GlobalShadows
         Lighting.FogEnd = originalLighting.FogEnd
+        Lighting.ClockTime = originalLighting.ClockTime
     end,
 })
 
@@ -635,15 +640,13 @@ TabWorld:CreateToggle({
 -- DIAGNOSTICS
 --==================================================
 
-local statusLabel
-
 TabDiagnostics:CreateParagraph({
     Title = "Runtime Diagnostics",
-    Content = "Run the diagnostic scan to inspect the current Studio test state."
+    Content = "Scan and inspect local player environment and active script hooks."
 })
 
 TabDiagnostics:CreateButton({
-    Name = "Run Diagnostics",
+    Name = "Run Diagnostics Scan",
     Callback = function()
         local character = getCharacter()
         local humanoid = getHumanoid()
@@ -651,47 +654,30 @@ TabDiagnostics:CreateButton({
         local camera = workspace.CurrentCamera
 
         local report =
-            "ENI HUB V2.8\n\n" ..
-            "Studio: " .. tostring(RunService:IsStudio()) .. "\n" ..
+            "ENI HUB V2.9 FINAL REPORT\n\n" ..
+            "Status: CLOSING / DISCONTINUED\n" ..
+            "Studio Active: " .. tostring(RunService:IsStudio()) .. "\n" ..
             "Character: " .. (character and "OK" or "MISSING") .. "\n" ..
             "Humanoid: " .. (humanoid and "OK" or "MISSING") .. "\n" ..
             "RootPart: " .. (root and "OK" or "MISSING") .. "\n" ..
             "Camera: " .. (camera and "OK" or "MISSING") .. "\n" ..
-            "Fly: " .. tostring(Config.Fly) .. "\n" ..
-            "Noclip: " .. tostring(Config.Noclip) .. "\n" ..
-            "ESP: " .. tostring(Config.ESP) .. "\n" ..
-            "Connections: " .. tostring(#Connections)
+            "Fly Active: " .. tostring(Config.Fly) .. "\n" ..
+            "Noclip Active: " .. tostring(Config.Noclip) .. "\n" ..
+            "ESP Targets: " .. getESPCount() .. "\n" ..
+            "Active Connections: " .. tostring(#Connections)
 
-        Rayfield:Notify({
-            Title = "Diagnostics",
-            Content = report,
-            Duration = 8,
-        })
-
+        Rayfield:Notify({ Title = "Diagnostics", Content = report, Duration = 8 })
         print(report)
     end,
 })
 
-TabDiagnostics:CreateButton({
-    Name = "Print Full State",
-    Callback = function()
-        print("========== ENI HUB V2.8 ==========")
-        for key, value in pairs(Config) do
-            print(key, "=", value)
-        end
-        print("Connections:", #Connections)
-        print("ESP Objects:", #espObjects)
-        print("==================================")
-    end,
-})
-
 --==================================================
--- SETTINGS / PANIC
+-- SETTINGS & PANIC
 --==================================================
 
 TabSettings:CreateParagraph({
     Title = "Panic Cleanup",
-    Content = "Press INSERT or use the button below to stop active systems and close the hub."
+    Content = "Press INSERT or click the button below to stop all functions and close the Hub."
 })
 
 local closed = false
@@ -701,10 +687,10 @@ local function shutdown()
     closed = true
 
     stopFly()
-
     Config.Noclip = false
+    Config.InfJump = false
+    Config.EnforceSpeed = false
     restoreCollision()
-
     clearESP()
 
     local humanoid = getHumanoid()
@@ -729,17 +715,12 @@ local function shutdown()
     disconnectAll()
     destroyTracked()
 
-    pcall(function()
-        Rayfield:Destroy()
-    end)
+    pcall(function() Rayfield:Destroy() end)
 end
 
 connect(UserInputService.InputBegan, function(input, processed)
     if processed then return end
-
-    if input.KeyCode == Enum.KeyCode.Insert then
-        shutdown()
-    end
+    if input.KeyCode == Enum.KeyCode.Insert then shutdown() end
 end)
 
 TabSettings:CreateButton({
@@ -747,8 +728,12 @@ TabSettings:CreateButton({
     Callback = shutdown,
 })
 
+--==================================================
+-- SHUTDOWN NOTIFICATION ON LAUNCH
+--==================================================
+
 Rayfield:Notify({
-    Title = "ENI HUB V2.8",
-    Content = "Developer Edition loaded successfully.",
-    Duration = 5,
+    Title = "ENI HUB IS CLOSING",
+    Content = "V2.9 is the FINAL build. Check the 'Annonce / Closing' tab for details.",
+    Duration = 10,
 })
